@@ -202,6 +202,8 @@
                                 drawBoard();
                                 const winMessage = document.getElementById("winMessage");
                                 winMessage.style.display = "none";
+                                currentPlayer = "black";
+                                displayMessage('>> 棋盤已重置！');
                                 break;
                             case 'MESSAGE':
                                 console.log(data.message);
