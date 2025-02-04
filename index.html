@@ -189,9 +189,11 @@
                             case 'PUT':
                                 board[data.y][data.x] = data.color;
                                 drawPiece(data.x, data.y, data.color);
+                                ctx.beginPath();
                                 if (checkWin(data.x, data.y, data.color)) {
                                     showWinMessage(data.color);
                                 }
+                                displayMessage(`>> ${data.color === "black" ? "黑棋" : "白棋"} 在 (${data.x}, ${data.y}) 下了一步棋，現在輪到「${data.color === "black" ? "白棋" : "黑棋"}」。`);
                                 currentPlayer = data.color === "black" ? "white" : "black";
                                 break;
                             case 'CLEAR':
