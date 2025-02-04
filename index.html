@@ -145,7 +145,9 @@
             <div id="room-btns">
                 <button id="reset-btn" class="room-btns" style="background-color: #ef233c;">重置棋盤</button>
                 <button id="random-id" class="room-btns" style="background-color: #9d4edd;">隨機房號</button>
-                <button id="ai" class="room-btns" style="background-image: linear-gradient(37deg, rgba(253,87,29,1) 50%, rgba(252,208,69,1) 100%);" onclick="alert('AI 已啟動')">AI</button>
+                <button id="ai" class="room-btns"
+                    style="background-image: linear-gradient(37deg, rgba(253,87,29,1) 50%, rgba(252,208,69,1) 100%);"
+                    onclick="alert('AI 已啟動')">AI</button>
             </div>
             <h2 style="font-size: 20px;">聊天</h2>
             <input type="text" id="user-id" name="user-is" placeholder="暱稱"
@@ -171,53 +173,57 @@
         const size = 15, cellSize = 30;
         const board = Array.from({ length: size }, () => Array(size).fill(null));
         let currentPlayer = "black";
-        const ws = new WebSocket('wss://tool.justapple.tw/websocket');
+        let ws;
+        function connectWS() {
+            ws = new WebSocket('wss://tool.justapple.tw/websocket')
 
-        ws.onopen = () => {
-            console.log('WebSocket 連線已建立');
-        };
+            ws.onopen = () => {
+                console.log('WebSocket 連線已建立');
+            };
 
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.protocol === 'gomoku' && data.room === roomId.value) {
-                    switch (data.action) {
-                        case 'PUT':
-                            board[data.y][data.x] = data.color;
-                            drawPiece(data.x, data.y, data.color);
-                            if (checkWin(data.x, data.y, data.color)) {
-                                showWinMessage(data.color);
-                            }
-                            currentPlayer = data.color === "black" ? "white" : "black";
-                            break;
-                        case 'CLEAR':
-                            board.forEach((row, y) => row.fill(null));
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            drawBoard();
-                            const winMessage = document.getElementById("winMessage");
-                            winMessage.style.display = "none";
-                            break;
-                        case 'MESSAGE':
-                            console.log(data.message);
-                            displayMessage(data.message);
-                            break;
-                        default:
-                            console.error('未知的行動:', data.action);
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.protocol === 'gomoku' && data.room === roomId.value) {
+                        switch (data.action) {
+                            case 'PUT':
+                                board[data.y][data.x] = data.color;
+                                drawPiece(data.x, data.y, data.color);
+                                if (checkWin(data.x, data.y, data.color)) {
+                                    showWinMessage(data.color);
+                                }
+                                currentPlayer = data.color === "black" ? "white" : "black";
+                                break;
+                            case 'CLEAR':
+                                board.forEach((row, y) => row.fill(null));
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                drawBoard();
+                                const winMessage = document.getElementById("winMessage");
+                                winMessage.style.display = "none";
+                                break;
+                            case 'MESSAGE':
+                                console.log(data.message);
+                                displayMessage(data.message);
+                                break;
+                            default:
+                                console.error('未知的行動:', data.action);
+                        }
                     }
+                } catch (error) {
+                    console.error('忽略非 JSON 格式訊息:', event.data);
                 }
-            } catch (error) {
-                console.error('忽略非 JSON 格式訊息:', event.data);
-            }
-        };
+            };
 
-        ws.onclose = () => {
-            console.log('WebSocket 連線已關閉');
-        };
+            ws.onclose = () => {
+                console.log('WebSocket 連線已關閉');
+                connectWS();
+            };
 
-        ws.onerror = (error) => {
-            console.error('WebSocket 發生錯誤:', error);
-        };
-
+            ws.onerror = (error) => {
+                console.error('WebSocket 發生錯誤:', error);
+            };
+        }
+connectWS();
         function drawBoard() {
             for (let i = 0; i < size; i++) {
                 ctx.beginPath();
