@@ -1,0 +1,2 @@
+# super-beta-gumoku
+awa
