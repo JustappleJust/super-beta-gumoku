@@ -223,7 +223,7 @@
                 console.error('WebSocket 發生錯誤:', error);
             };
         }
-connectWS();
+        connectWS();
         function drawBoard() {
             for (let i = 0; i < size; i++) {
                 ctx.beginPath();
@@ -298,6 +298,16 @@ connectWS();
             if (msg.value) {
                 ws.send(JSON.stringify({ protocol: 'gomoku', message: `${userID.value}: ${msg.value}`, action: 'MESSAGE', room: roomId.value }));
                 msg.value = '';
+            }
+        });
+
+        msg.addEventListener('keydown', function (event) {
+            if (event.key === "Enter") {
+                // 這裡放入您的 JavaScript 程式碼
+                if (msg.value) {
+                    ws.send(JSON.stringify({ protocol: 'gomoku', message: `${userID.value}: ${msg.value}`, action: 'MESSAGE', room: roomId.value }));
+                    msg.value = '';
+                }
             }
         });
 
