@@ -183,6 +183,7 @@
             ws = new WebSocket('wss://tool.justapple.tw/websocket')
 
             ws.onopen = () => {
+                displayMessage('>> 線上伺服器連線已建立！');
                 console.log('WebSocket 連線已建立');
             };
 
@@ -235,6 +236,7 @@
             };
 
             ws.onclose = () => {
+                displayMessage('>> 線上伺服器連線已關閉！');
                 console.log('WebSocket 連線已關閉');
                 connectWS();
             };
