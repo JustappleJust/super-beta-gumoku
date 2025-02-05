@@ -111,6 +111,11 @@
             margin-right: 5px;
         }
 
+        .input-area {
+            display: flex;
+            align-items: space-between;
+        }
+
         .message-input {
             flex-grow: 1;
             margin-right: 5px;
@@ -119,8 +124,6 @@
         .send-button {
             background-color: #2b9348;
             color: white;
-            border-style: none;
-            border-radius: 5px;
             cursor: pointer;
         }
 
@@ -157,9 +160,11 @@
             </div>
             <div class="input-area">
                 <input type="text" id="message-input" class="message-input" placeholder="輸入訊息"
-                    style="border-style: none; border-radius: 20px; padding: 5px 10px;">
+                    style="border-style: none; border-radius: 20px; padding: 5px 10px; margin: 2px;">
                 <button id="send-button" class="send-button"
-                    style="border-style: none; border-radius: 20px; padding: 5px 10px;">發送</button>
+                    style="border-style: none; border-radius: 20px; padding: 5px 10px; margin: 2px;">房間</button>
+                <button id="global-button" class="send-button"
+                    style="border-style: none; border-radius: 20px; padding: 5px 10px; margin: 2px;">全球</button>
             </div>
         </div>
     </div>
@@ -187,16 +192,19 @@
                     if (data.protocol === 'gomoku' && data.room === roomId.value) {
                         switch (data.action) {
                             case 'PUT':
+                                if (roomId.value == '') break;
                                 board[data.y][data.x] = data.color;
                                 drawPiece(data.x, data.y, data.color);
                                 ctx.beginPath();
                                 if (checkWin(data.x, data.y, data.color)) {
                                     showWinMessage(data.color);
+                                } else {
+                                    displayMessage(`>> ${data.color === "black" ? "黑棋" : "白棋"} 在 (${data.x}, ${data.y}) 下了一步棋，現在輪到「${data.color === "black" ? "白棋" : "黑棋"}」。`);
                                 }
-                                displayMessage(`>> ${data.color === "black" ? "黑棋" : "白棋"} 在 (${data.x}, ${data.y}) 下了一步棋，現在輪到「${data.color === "black" ? "白棋" : "黑棋"}」。`);
                                 currentPlayer = data.color === "black" ? "white" : "black";
                                 break;
                             case 'CLEAR':
+                                if (roomId.value == '') break;
                                 board.forEach((row, y) => row.fill(null));
                                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                                 drawBoard();
@@ -206,12 +214,20 @@
                                 displayMessage('>> 棋盤已重置！');
                                 break;
                             case 'MESSAGE':
+                                if (data.room == '') break;
+                                console.log(data.message);
+                                displayMessage(data.message);
+                                break;
+                            case 'GLOBAL':
                                 console.log(data.message);
                                 displayMessage(data.message);
                                 break;
                             default:
                                 console.error('未知的行動:', data.action);
                         }
+                    } else if (data.action === 'GLOBAL') {
+                        console.log(data.message);
+                        displayMessage(data.message);
                     }
                 } catch (error) {
                     console.error('忽略非 JSON 格式訊息:', event.data);
@@ -266,6 +282,7 @@
         }
 
         function showWinMessage(color) {
+            displayMessage(`>> ${color === "black" ? "黑棋" : "白棋"} 獲勝！點擊「重置棋盤」再玩一局！`);
             const winMessage = document.getElementById("winMessage");
             winMessage.textContent = `${color === "black" ? "黑棋" : "白棋"} 獲勝！`;
             winMessage.style.display = "block";
@@ -278,8 +295,8 @@
             if (board[y][x] === null) {
                 board[y][x] = currentPlayer;
                 drawPiece(x, y, currentPlayer);
-                ws.send(JSON.stringify({ protocol: 'gomoku', room: roomId.value, action: 'PUT', x, y, color: currentPlayer }));
-                if (checkWin(x, y, currentPlayer)) {
+                if (roomId.value !== '') ws.send(JSON.stringify({ protocol: 'gomoku', room: roomId.value, action: 'PUT', x, y, color: currentPlayer }));
+                if (roomId.value == '' && checkWin(x, y, currentPlayer)) {
                     showWinMessage(currentPlayer);
                 }
                 currentPlayer = currentPlayer === "black" ? "white" : "black";
@@ -295,22 +312,53 @@
         });
 
         document.getElementById('reset-btn').addEventListener("click", () => {
-            ws.send(JSON.stringify({ protocol: 'gomoku', room: roomId.value, action: 'CLEAR' }));
+            if (roomId.value == '') {
+                board.forEach((row, y) => row.fill(null));
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawBoard();
+                const winMessage = document.getElementById("winMessage");
+                winMessage.style.display = "none";
+                currentPlayer = "black";
+                displayMessage('>> 棋盤已重置！');
+            } else {
+                ws.send(JSON.stringify({ protocol: 'gomoku', room: roomId.value, action: 'CLEAR' }));
+            }
         });
 
         document.getElementById('send-button').addEventListener("click", () => {
             if (msg.value) {
-                ws.send(JSON.stringify({ protocol: 'gomoku', message: `${userID.value}: ${msg.value}`, action: 'MESSAGE', room: roomId.value }));
+                if (roomId.value !== '') {
+                    ws.send(JSON.stringify({ protocol: 'gomoku', message: `${userID.value}: ${msg.value}`, action: 'MESSAGE', room: roomId.value }));
+                } else {
+                    displayMessage(`${userID.value}: ${msg.value}`);
+                }
+                msg.value = '';
+            }
+        });
+
+        document.getElementById('global-button').addEventListener("click", () => {
+            if (msg.value) {
+                ws.send(JSON.stringify({ protocol: 'gomoku', message: `🌐${userID.value}: ${msg.value}`, action: 'GLOBAL', room: roomId.value }));
                 msg.value = '';
             }
         });
 
         msg.addEventListener('keydown', function (event) {
             if (event.key === "Enter") {
-                // 這裡放入您的 JavaScript 程式碼
-                if (msg.value) {
-                    ws.send(JSON.stringify({ protocol: 'gomoku', message: `${userID.value}: ${msg.value}`, action: 'MESSAGE', room: roomId.value }));
-                    msg.value = '';
+                if (event.shiftKey) {
+                    if (msg.value) {
+                        ws.send(JSON.stringify({ protocol: 'gomoku', message: `🌐${userID.value}: ${msg.value}`, action: 'GLOBAL', room: roomId.value }));
+                        msg.value = '';
+                    }
+                } else {
+                    if (msg.value) {
+                        if (roomId.value !== '') {
+                            ws.send(JSON.stringify({ protocol: 'gomoku', message: `${userID.value}: ${msg.value}`, action: 'MESSAGE', room: roomId.value }));
+                        } else {
+                            displayMessage(`${userID.value}: ${msg.value}`);
+                        }
+                        msg.value = '';
+                    }
                 }
             }
         });
