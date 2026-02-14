@@ -180,7 +180,7 @@
         let currentPlayer = "black";
         let ws;
         function connectWS() {
-            ws = new WebSocket('wss://tool.justapple.tw/websocket')
+            ws = new WebSocket('wss://tool.justapple.tw/ws/super-beta-gumoku')
 
             ws.onopen = () => {
                 displayMessage('>> 線上伺服器連線已建立！');
