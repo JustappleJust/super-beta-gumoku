@@ -148,9 +148,8 @@
             <div id="room-btns">
                 <button id="reset-btn" class="room-btns" style="background-color: #ef233c;">重置棋盤</button>
                 <button id="random-id" class="room-btns" style="background-color: #9d4edd;">隨機房號</button>
-                <button id="ai" class="room-btns"
-                    style="background-image: linear-gradient(37deg, rgba(253,87,29,1) 50%, rgba(252,208,69,1) 100%);"
-                    onclick="alert('AI 已啟動')">AI</button>
+                <button id="sync-btn" class="room-btns"
+                    style="background-image: linear-gradient(37deg, rgba(253,87,29,1) 50%, rgba(252,208,69,1) 100%);">同步棋盤</button>
             </div>
             <h2 style="font-size: 20px;">聊天</h2>
             <input type="text" id="user-id" name="user-is" placeholder="暱稱"
@@ -176,9 +175,14 @@
         const msg = document.getElementById("message-input");
         const ctx = canvas.getContext("2d");
         const size = 15, cellSize = 30;
-        const board = Array.from({ length: size }, () => Array(size).fill(null));
+        let board = Array.from({ length: size }, () => Array(size).fill(null));
         let currentPlayer = "black";
         let ws;
+
+        // 同步相關變數
+        let isSyncing = false;
+        let syncResponses = [];
+
         function connectWS() {
             ws = new WebSocket('wss://tool.justapple.tw/ws/super-beta-gumoku')
 
@@ -223,6 +227,23 @@
                                 console.log(data.message);
                                 displayMessage(data.message);
                                 break;
+                            case 'REQ_SYNC':
+                                // 收到同步請求，廣播自己的棋盤
+                                const currentPieces = board.flat().filter(p => p !== null).length;
+                                ws.send(JSON.stringify({
+                                    protocol: 'gomoku',
+                                    room: roomId.value,
+                                    action: 'RES_SYNC',
+                                    board: board,
+                                    count: currentPieces
+                                }));
+                                break;
+                            case 'RES_SYNC':
+                                // 只有發起請求的人會處理回應
+                                if (isSyncing) {
+                                    syncResponses.push(data);
+                                }
+                                break;
                             default:
                                 console.error('未知的行動:', data.action);
                         }
@@ -238,7 +259,7 @@
             ws.onclose = () => {
                 displayMessage('>> 線上伺服器連線已關閉！');
                 console.log('WebSocket 連線已關閉');
-                connectWS();
+                setTimeout(connectWS, 1000);
             };
 
             ws.onerror = (error) => {
@@ -246,7 +267,9 @@
             };
         }
         connectWS();
+
         function drawBoard() {
+            ctx.strokeStyle = "#000";
             for (let i = 0; i < size; i++) {
                 ctx.beginPath();
                 ctx.moveTo(i * cellSize + cellSize / 2, cellSize / 2);
@@ -309,8 +332,56 @@
             return Math.random().toString(36).substring(2, 10);
         }
 
+        // 同步棋盤主邏輯
+        function requestSync() {
+            if (!roomId.value) return;
+            isSyncing = true;
+            syncResponses = [];
+            displayMessage('>> 正在同步棋盤內容...');
+            ws.send(JSON.stringify({ protocol: 'gomoku', room: roomId.value, action: 'REQ_SYNC' }));
+
+            setTimeout(() => {
+                isSyncing = false;
+                if (syncResponses.length > 0) {
+                    // 挑選落子數量最多的回應
+                    const bestResponse = syncResponses.reduce((prev, current) => (prev.count > current.count) ? prev : current);
+                    applySyncedBoard(bestResponse.board);
+                    displayMessage(`>> 同步完成！更新了 ${bestResponse.count} 顆棋子。`);
+                } else {
+                    displayMessage('>> 同步結束：未收到任何回應。');
+                }
+            }, 2000);
+        }
+
+        function applySyncedBoard(newBoard) {
+            board = newBoard;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoard();
+            let pieceCount = 0;
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if (board[y][x]) {
+                        drawPiece(x, y, board[y][x]);
+                        pieceCount++;
+                    }
+                }
+            }
+            // 根據總子數判斷輪到誰 (假設黑先)
+            currentPlayer = (pieceCount % 2 === 0) ? "black" : "white";
+            document.getElementById("winMessage").style.display = "none";
+        }
+
         document.getElementById('random-id').addEventListener("click", () => {
             roomId.value = generateRandomId();
+            requestSync(); // 房號變更時觸發
+        });
+
+        roomId.addEventListener("change", () => {
+            requestSync(); // 手動修改房號後失去焦點時觸發
+        });
+
+        document.getElementById('sync-btn').addEventListener("click", () => {
+            requestSync(); // 按鈕手動觸發
         });
 
         document.getElementById('reset-btn').addEventListener("click", () => {
@@ -370,8 +441,9 @@
             const messageDiv = document.createElement('div');
             messageDiv.textContent = `${message}`;
             messageArea.appendChild(messageDiv);
-            messageArea.scrollTop = messageArea.scrollHeight; // 讓捲軸永遠在最下面
+            messageArea.scrollTop = messageArea.scrollHeight; 
         }
+
         roomId.value = generateRandomId();
         drawBoard();
         displayMessage("<< ⚠️ >>\n近期線上伺服器正在進行升級作業，線上功能可能不穩定或不可用，造成不便敬請見諒。\n更多資訊請至 https://justapple.tw 查看。\n<< ⚠️ >>");
